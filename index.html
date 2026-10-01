@@ -167,7 +167,15 @@
         box-shadow: 0 0 6px rgba(2, 132, 199, 0.5);
       }
 
+      .btn-mode.active {
+        background-color: #e65100;
+        border-color: #ff9800;
+        color: #fff;
+        box-shadow: 0 0 6px rgba(230, 81, 0, 0.6);
+      }
+
       .btn-primary {
+
         background-color: var(--primary);
         border-color: var(--primary-dark);
       }
@@ -237,11 +245,8 @@
         font-size: 14px;
         direction: ltr;
         line-height: 1.5;
-        touch-action: pan-x pan-y pinch-zoom !important;
-        -webkit-user-select: text !important;
-        user-select: text !important;
+        touch-action: pan-x pan-y !important;
       }
-
 
       .CodeMirror-lines,
       .CodeMirror-line,
@@ -400,12 +405,18 @@
           <svg viewBox="0 0 24 24"><path d="M3 21v-2h18v2H3zm0-4v-2h12v2H3zm0-4v-2h18v2H3zm0-4V7h12v2H3zm0-4V3h18v2H3z"/></svg>
         </button>
 
+        <!-- زر التحويل بين تحديد المتصفح والتحديد المدمج -->
+        <button id="btn-toggle-mode" class="btn btn-mode" onclick="toggleSelectionMode()" title="التبديل بين تحديد النظام الحر وشريط الاستبدال">
+          🌐 تحديد أندرويد
+        </button>
+
         <button class="btn" onclick="document.getElementById('file-input').click()">
 
 
           📂 فتح
         </button>
         <input type="file" id="file-input" accept=".txt,.html,.js,.css,.py,.json,.php,.java,.c,.cpp">
+
 
         <button class="btn btn-primary" onclick="downloadFile()">
           💾 حفظ
@@ -508,12 +519,71 @@
         inputStyle: 'textarea'
       });
 
-      // السماح للنظام الأصلي بإظهار مقابض التحديد وسحب الحواف بحرية تامة
-      container.addEventListener('contextmenu', (e) => {
-        if (editor.somethingSelected()) {
-          e.preventDefault();
-          showActionBarAt(e.clientX, e.clientY);
+      // وضع التحديد: false = وضع المحرر المدمج، true = وضع المتصفح/أندرويد الطبيعي
+      let isNativeSelectionMode = false;
+
+      function toggleSelectionMode() {
+        isNativeSelectionMode = !isNativeSelectionMode;
+        const btn = document.getElementById('btn-toggle-mode');
+
+        if (isNativeSelectionMode) {
+          btn.classList.add('active');
+          btn.innerText = '📱 وضع أندرويد (نشط)';
+          quickActionBar.style.display = 'none';
+          document.getElementById('match-status').innerText = 'تم التبديل لتحديد المتصفح الطبيعي الحر';
+        } else {
+          btn.classList.remove('active');
+          btn.innerText = '🌐 تحديد أندرويد';
+          document.getElementById('match-status').innerText = 'تم التبديل لنظام المحرر المدمج (استبدال/أوامر)';
+          if (editor.somethingSelected()) {
+            updateQuickActionBar();
+          }
         }
+      }
+
+      // إظهار الشريط عند الضغط المطول أو النقر بالزر الأيمن فقط في وضع المحرر المدمج
+      container.addEventListener('contextmenu', (e) => {
+        if (isNativeSelectionMode) return; // السماح لقائمة أندرويد الطبيعية بالظهور بدون أي تدخل
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!editor.somethingSelected()) {
+          const clickPos = editor.coordsChar({ left: e.clientX, top: e.clientY }, "page");
+          const wordRange = editor.findWordAt(clickPos);
+          editor.setSelection(wordRange.anchor, wordRange.head);
+        }
+
+        showActionBarAt(e.clientX, e.clientY);
+      }, true);
+
+      // دعم الضغط المطول فقط إذا كان وضع المحرر المدمج مفعلاً
+      let touchTimer = null;
+      let touchMoved = false;
+
+      container.addEventListener('touchstart', (e) => {
+        if (isNativeSelectionMode) return; // ترك شاشة اللمس للنظام الحر عند تفعيل وضع أندرويد
+        if (e.touches.length !== 1) return;
+        touchMoved = false;
+        const touch = e.touches[0];
+        
+        touchTimer = setTimeout(() => {
+          if (!touchMoved && !isNativeSelectionMode) {
+            const touchPos = editor.coordsChar({ left: touch.clientX, top: touch.clientY }, "page");
+            if (!editor.somethingSelected()) {
+              const wordRange = editor.findWordAt(touchPos);
+              editor.setSelection(wordRange.anchor, wordRange.head);
+            }
+            editor.focus();
+            showActionBarAt(touch.clientX, touch.clientY);
+          }
+        }, 450);
+      }, { passive: true });
+
+      container.addEventListener('touchend', () => clearTimeout(touchTimer));
+      container.addEventListener('touchmove', () => {
+        touchMoved = true;
+        clearTimeout(touchTimer);
       });
 
 
@@ -670,8 +740,13 @@
       editor.on('cursorActivity', () => {
         const pos = editor.getCursor();
         document.getElementById('cursor-pos').innerText = `السطر: ${pos.line + 1} | العمود: ${pos.ch + 1}`;
-        requestAnimationFrame(updateQuickActionBar);
+        if (!isNativeSelectionMode) {
+          requestAnimationFrame(updateQuickActionBar);
+        } else {
+          quickActionBar.style.display = 'none';
+        }
       });
+
 
       editor.on('scroll', () => {
         if (editor.somethingSelected()) {
