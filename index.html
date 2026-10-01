@@ -17,8 +17,11 @@
         --accent-match: #ff9800;
         --replace-color: #2e7d32;
         --replace-hover: #1b5e20;
+        --cancel-color: #d32f2f;
+        --cancel-hover: #b71c1c;
         --popup-bg: #2d2d2d;
         --popup-border: #4a4a4a;
+
       }
 
       * {
@@ -334,7 +337,19 @@
         background-color: var(--replace-hover);
       }
 
+      .qa-btn.btn-cancel-accent {
+        background-color: var(--cancel-color);
+        color: #fff;
+        font-weight: bold;
+        padding: 5px 8px;
+      }
+
+      .qa-btn.btn-cancel-accent:active {
+        background-color: var(--cancel-hover);
+      }
+
       .qa-divider {
+
         width: 1px;
         height: 16px;
         background: #444;
@@ -401,7 +416,12 @@
         <svg viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 16H5V5h2v3h10V5h2v14z"/><path d="M12 18l4-4h-3V9h-2v5H8z"/></svg>
         <span>استبدال</span>
       </button>
+      <button id="qa-cancel-btn" class="qa-btn btn-cancel-accent" onclick="cancelSearchAndHighlight()" title="إلغاء التظليل وقفل البحث للتحرك بحرية">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        <span>إلغاء</span>
+      </button>
       <div class="qa-divider"></div>
+
       <button class="qa-btn" onclick="quickCopy()" title="نسخ">
         <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
         <span>نسخ</span>
@@ -433,10 +453,14 @@
     <div class="search-panel">
       <div class="search-row">
         <textarea id="search-box" class="search-input" placeholder="الصق هنا الكود القديم للبحث عنه..." rows="1"></textarea>
+        <button class="btn" onclick="pasteAndSearch()" style="height: 36px; padding: 0 10px; white-space: nowrap; background-color: #374151;" title="لصق من الحافظة والبحث فوراً">
+          📋 لصق وبحث
+        </button>
         <button class="btn btn-primary" onclick="executeSmartSearch()" style="height: 36px; padding: 0 12px; white-space: nowrap;">
           🔍 انتقال
         </button>
       </div>
+
       <div class="search-info">
         <span id="match-status">البحث الذكي يتجاهل الفراغات والشروحات العربية للأكواد</span>
         <span id="match-score" class="similarity-tag"></span>
@@ -478,39 +502,51 @@
         matchBrackets: true,
         direction: 'ltr',
         viewportMargin: 20,
-        inputStyle: 'contenteditable'
+        inputStyle: 'textarea'
       });
 
-      // إظهار الشريط عند الضغط المطول أو النقر بالزر الأيمن في أي مكان (حتى لو فارغ)
+      // إظهار الشريط عند الضغط المطول أو النقر بالزر الأيمن
       container.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        // تحريك المؤشر لمكان الضغطة إذا لم يكن هناك تحديد
         if (!editor.somethingSelected()) {
           const clickPos = editor.coordsChar({ left: e.clientX, top: e.clientY }, "page");
-          editor.setCursor(clickPos);
+          const wordRange = editor.findWordAt(clickPos);
+          editor.setSelection(wordRange.anchor, wordRange.head);
         }
 
         showActionBarAt(e.clientX, e.clientY);
       }, true);
 
-      // دعم الضغط المطول على شاشات اللمس (Long Press)
+      // دعم الضغط المطول على شاشات اللمس بدقة لتمرير حواف التحديد
       let touchTimer = null;
+      let touchMoved = false;
+
       container.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) return;
+        touchMoved = false;
         const touch = e.touches[0];
+        
         touchTimer = setTimeout(() => {
-          if (!editor.somethingSelected()) {
+          if (!touchMoved) {
             const touchPos = editor.coordsChar({ left: touch.clientX, top: touch.clientY }, "page");
-            editor.setCursor(touchPos);
+            if (!editor.somethingSelected()) {
+              const wordRange = editor.findWordAt(touchPos);
+              editor.setSelection(wordRange.anchor, wordRange.head);
+            }
+            editor.focus();
+            showActionBarAt(touch.clientX, touch.clientY);
           }
-          showActionBarAt(touch.clientX, touch.clientY);
-        }, 500);
+        }, 450);
       }, { passive: true });
 
       container.addEventListener('touchend', () => clearTimeout(touchTimer));
-      container.addEventListener('touchmove', () => clearTimeout(touchTimer));
+      container.addEventListener('touchmove', () => {
+        touchMoved = true;
+        clearTimeout(touchTimer);
+      });
+
 
 
       // استعادة المحتوى المحفوظ
@@ -525,7 +561,23 @@
         localStorage.setItem('smart_editor_code', editor.getValue());
       });
 
+      // إلغاء تظليل البحث وفك التحديد للتحرك بحرية
+      function cancelSearchAndHighlight() {
+        markInstances.forEach(m => m.clear());
+        markInstances = [];
+        lastMatchedRange = null;
+
+        const cursor = editor.getCursor("from") || editor.getCursor();
+        editor.setCursor(cursor);
+
+        quickActionBar.style.display = 'none';
+        document.getElementById('match-status').innerText = 'تم إلغاء البحث والتظليل - يمكنك التحرك بحرية الآن';
+        document.getElementById('match-score').innerText = '';
+        editor.focus();
+      }
+
       // دوال التراجع والإعادة
+
       function editorUndo() {
         editor.undo();
         editor.focus();
@@ -790,7 +842,26 @@
         quickActionBar.style.display = 'none';
       }
 
+      // لصق محتوى الحافظة مباشرة في البحث والتنفيذ فوراً
+      async function pasteAndSearch() {
+        const searchInput = document.getElementById('search-box');
+        let text = '';
+        try {
+          text = await navigator.clipboard.readText();
+        } catch (e) {
+          text = prompt("الصق الكود المراد البحث عنه:");
+        }
+
+        if (text && text.trim()) {
+          searchInput.value = text;
+          executeSmartSearch();
+        } else {
+          alert('الحافظة فارغة أو لم يتم منح إذن القراءة!');
+        }
+      }
+
       // فتح وتنزيل الملفات
+
       document.getElementById('file-input').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
