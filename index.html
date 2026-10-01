@@ -559,27 +559,43 @@
           btn.innerText = '📱 وضع أندرويد txt (نشط)';
           quickActionBar.style.display = 'none';
 
-          // نسخ الكود الحالي إلى حقل الإدخال الأصلي وإظهاره بمقابض ودبابيس أندرويد الأصلية
+          // حفظ موضع المؤشر ونسبة التمرير بالضبط حتى لا ينزل لآخر الملف
+          const curPos = editor.getCursor();
+          const cursorIndex = editor.indexFromPos(curPos);
+          const scrollInfo = editor.getScrollInfo();
+
           nativeEditor.value = editor.getValue();
           cmWrapper.style.display = 'none';
           nativeEditor.style.display = 'block';
-          nativeEditor.focus();
 
-          document.getElementById('match-status').innerText = 'تم التبديل لمحرر نصوص حقيقي: دبابيس التحديد ومقابض أندرويد مفعلة بالكامل';
+          // نقل المؤشر ونفس التمرير للسطر الحالي في حقل أندرويد
+          nativeEditor.setSelectionRange(cursorIndex, cursorIndex);
+          nativeEditor.scrollTop = scrollInfo.top;
+
+          document.getElementById('match-status').innerText = 'تم التبديل لمحرر نصوص حقيقي في نفس موضع السطر بالضبط';
         } else {
           btn.classList.remove('active');
           btn.innerText = '🌐 تحديد أندرويد (txt)';
 
-          // إعادة التزامن وإظهار محرر الأكواد الذكي مع شريط الاستبدال
+          // حفظ موضع مؤشر والتمرير من حقل أندرويد
+          const cursorIndex = nativeEditor.selectionStart || 0;
+          const savedScrollTop = nativeEditor.scrollTop;
+
           editor.setValue(nativeEditor.value);
           nativeEditor.style.display = 'none';
           cmWrapper.style.display = 'block';
           editor.refresh();
+
+          // إعادة المؤشر والتمرير لنفس السطر في محرر الأكواد
+          const newPos = editor.posFromIndex(cursorIndex);
+          editor.setCursor(newPos);
+          editor.scrollTo(null, savedScrollTop);
           editor.focus();
 
-          document.getElementById('match-status').innerText = 'تمت العودة لوضع الأكواد البرمجية والشريط المدمج';
+          document.getElementById('match-status').innerText = 'تمت العودة لوضع الأكواد البرمجية في نفس السطر';
         }
       }
+
 
 
 
