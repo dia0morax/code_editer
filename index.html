@@ -237,8 +237,11 @@
         font-size: 14px;
         direction: ltr;
         line-height: 1.5;
-        touch-action: pan-x pan-y !important;
+        touch-action: pan-x pan-y pinch-zoom !important;
+        -webkit-user-select: text !important;
+        user-select: text !important;
       }
+
 
       .CodeMirror-lines,
       .CodeMirror-line,
@@ -505,47 +508,14 @@
         inputStyle: 'textarea'
       });
 
-      // إظهار الشريط عند الضغط المطول أو النقر بالزر الأيمن
+      // السماح للنظام الأصلي بإظهار مقابض التحديد وسحب الحواف بحرية تامة
       container.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!editor.somethingSelected()) {
-          const clickPos = editor.coordsChar({ left: e.clientX, top: e.clientY }, "page");
-          const wordRange = editor.findWordAt(clickPos);
-          editor.setSelection(wordRange.anchor, wordRange.head);
+        if (editor.somethingSelected()) {
+          e.preventDefault();
+          showActionBarAt(e.clientX, e.clientY);
         }
-
-        showActionBarAt(e.clientX, e.clientY);
-      }, true);
-
-      // دعم الضغط المطول على شاشات اللمس بدقة لتمرير حواف التحديد
-      let touchTimer = null;
-      let touchMoved = false;
-
-      container.addEventListener('touchstart', (e) => {
-        if (e.touches.length !== 1) return;
-        touchMoved = false;
-        const touch = e.touches[0];
-        
-        touchTimer = setTimeout(() => {
-          if (!touchMoved) {
-            const touchPos = editor.coordsChar({ left: touch.clientX, top: touch.clientY }, "page");
-            if (!editor.somethingSelected()) {
-              const wordRange = editor.findWordAt(touchPos);
-              editor.setSelection(wordRange.anchor, wordRange.head);
-            }
-            editor.focus();
-            showActionBarAt(touch.clientX, touch.clientY);
-          }
-        }, 450);
-      }, { passive: true });
-
-      container.addEventListener('touchend', () => clearTimeout(touchTimer));
-      container.addEventListener('touchmove', () => {
-        touchMoved = true;
-        clearTimeout(touchTimer);
       });
+
 
 
 
