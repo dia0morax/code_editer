@@ -248,6 +248,25 @@
         touch-action: pan-x pan-y !important;
       }
 
+      #native-editor {
+        display: none;
+        width: 100%;
+        height: 100%;
+        background-color: var(--bg-dark);
+        color: var(--text-color);
+        font-family: 'Consolas', 'Fira Code', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        padding: 10px;
+        border: none;
+        outline: none;
+        resize: none;
+        direction: ltr;
+        white-space: pre;
+        overflow: auto;
+      }
+
+
       .CodeMirror-lines,
       .CodeMirror-line,
       .CodeMirror-code,
@@ -407,8 +426,9 @@
 
         <!-- زر التحويل بين تحديد المتصفح والتحديد المدمج -->
         <button id="btn-toggle-mode" class="btn btn-mode" onclick="toggleSelectionMode()" title="التبديل بين تحديد النظام الحر وشريط الاستبدال">
-          🌐 تحديد أندرويد
+          🌐 تحديد أندرويد (txt)
         </button>
+
 
         <button class="btn" onclick="document.getElementById('file-input').click()">
 
@@ -484,7 +504,9 @@
     <!-- المحرر -->
     <div class="editor-container" id="editor-container">
       <textarea id="editor"></textarea>
+      <textarea id="native-editor" spellcheck="false" placeholder="اكتب أو الصق الكود هنا..."></textarea>
     </div>
+
 
     <footer>
       <span id="cursor-pos">السطر: 1 | العمود: 1</span>
@@ -519,27 +541,47 @@
         inputStyle: 'textarea'
       });
 
-      // وضع التحديد: false = وضع المحرر المدمج، true = وضع المتصفح/أندرويد الطبيعي
+      // وضع التحديد: false = وضع المحرر المدمج، true = وضع المتصفح/أندرويد الطبيعي (نص txt حقيقي)
       let isNativeSelectionMode = false;
+      const nativeEditor = document.getElementById('native-editor');
+
+      nativeEditor.addEventListener('input', () => {
+        localStorage.setItem('smart_editor_code', nativeEditor.value);
+      });
 
       function toggleSelectionMode() {
         isNativeSelectionMode = !isNativeSelectionMode;
         const btn = document.getElementById('btn-toggle-mode');
+        const cmWrapper = editor.getWrapperElement();
 
         if (isNativeSelectionMode) {
           btn.classList.add('active');
-          btn.innerText = '📱 وضع أندرويد (نشط)';
+          btn.innerText = '📱 وضع أندرويد txt (نشط)';
           quickActionBar.style.display = 'none';
-          document.getElementById('match-status').innerText = 'تم التبديل لتحديد المتصفح الطبيعي الحر';
+
+          // نسخ الكود الحالي إلى حقل الإدخال الأصلي وإظهاره بمقابض ودبابيس أندرويد الأصلية
+          nativeEditor.value = editor.getValue();
+          cmWrapper.style.display = 'none';
+          nativeEditor.style.display = 'block';
+          nativeEditor.focus();
+
+          document.getElementById('match-status').innerText = 'تم التبديل لمحرر نصوص حقيقي: دبابيس التحديد ومقابض أندرويد مفعلة بالكامل';
         } else {
           btn.classList.remove('active');
-          btn.innerText = '🌐 تحديد أندرويد';
-          document.getElementById('match-status').innerText = 'تم التبديل لنظام المحرر المدمج (استبدال/أوامر)';
-          if (editor.somethingSelected()) {
-            updateQuickActionBar();
-          }
+          btn.innerText = '🌐 تحديد أندرويد (txt)';
+
+          // إعادة التزامن وإظهار محرر الأكواد الذكي مع شريط الاستبدال
+          editor.setValue(nativeEditor.value);
+          nativeEditor.style.display = 'none';
+          cmWrapper.style.display = 'block';
+          editor.refresh();
+          editor.focus();
+
+          document.getElementById('match-status').innerText = 'تمت العودة لوضع الأكواد البرمجية والشريط المدمج';
         }
       }
+
+
 
       // إظهار الشريط عند الضغط المطول أو النقر بالزر الأيمن فقط في وضع المحرر المدمج
       container.addEventListener('contextmenu', (e) => {
@@ -632,7 +674,8 @@
 
       // دالة تشغيل ومعاينة الكود
       function runPreview() {
-        const code = editor.getValue();
+        const code = isNativeSelectionMode ? nativeEditor.value : editor.getValue();
+
         const blob = new Blob([code], { type: 'text/html;charset=utf-8' });
         const previewUrl = URL.createObjectURL(blob);
         window.open(previewUrl, '_blank');
@@ -922,7 +965,8 @@
       });
 
       function downloadFile() {
-        const text = editor.getValue();
+        const text = isNativeSelectionMode ? nativeEditor.value : editor.getValue();
+
         const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
